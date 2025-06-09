@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sear - YouTube Music Player avec IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0f172a; /* bg-slate-900 */
+            color: #cbd5e1; /* text-slate-300 */
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; /* bg-slate-800 */ }
+        ::-webkit-scrollbar-thumb { background: #475569; /* bg-slate-600 */ border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; /* bg-slate-500 */ }
+        
+        input[type=range].player-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%;
+            background: #ffffff; cursor: pointer; margin-top: -5px; transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+        input[type=range].player-slider:hover::-webkit-slider-thumb { 
+            transform: scale(1.2); 
+            background-color: #34d399; /* emerald-400 */
+        }
+
+        .song-row:hover .play-icon, .song-row.is-playing .play-icon { opacity: 1; }
+        .song-row .play-icon { opacity: 0; transition: opacity 0.2s ease-in-out; }
+        
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.2); border-left-color: #34d399; /* emerald-400 */
+            border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .loop-btn.active, .lyrics-btn:hover { color: #34d399; }
+
+        /* Classe pour le menu latéral sur mobile */
+        .sidebar-open {
+            transform: translateX(0) !important;
+        }
+    </style>
+</head>
+<body class="text-slate-300">
+
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-20 hidden lg:hidden"></div>
+    <div class="lg:grid lg:grid-cols-[280px_1fr] h-[calc(100vh-90px)]">
+        <aside id="sidebar" class="fixed top-0 left-0 h-full w-72 bg-slate-900/95 backdrop-blur-sm lg:static lg:w-auto lg:h-auto lg:bg-black/30 p-4 flex flex-col gap-4 transform -translate-x-full lg:transform-none transition-transform duration-300 ease-in-out z-30">
+            <div>
+                <h2 class="text-lg font-bold text-white mb-4 px-2">Bibliothèque</h2>
+                <nav>
+                    <ul id="playlists-nav" class="space-y-2">
+                        </ul>
+                </nav>
+            </div>
+            <div class="mt-auto space-y-2">
+                 <button id="ai-playlist-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-1.2 0-2.3.4-3.1 1.2A5.8 5.8 0 0 0 5 8.1c0 2.2 1.2 4.2 3 5.2.5.3 1.2.3 1.7 0 1.8-1 3-3 3-5.2A5.8 5.8 0 0 0 8.1 4.2 4.3 4.3 0 0 0 9 3m3 0"/><path d="M12 3c1.2 0 2.3.4 3.1 1.2A5.8 5.8 0 0 1 19 8.1c0 2.2-1.2 4.2-3 5.2-.5.3-1.2.3-1.7 0-1.8-1-3-3-3-5.2A5.8 5.8 0 0 1 15.9 4.2 4.3 4.3 0 0 1 15 3m-3 12c-1.2 0-2.3.4-3.1 1.2A5.8 5.8 0 0 0 5 20.1c0 2.2 1.2 4.2 3 5.2.5.3 1.2.3 1.7 0 1.8-1 3-3 3-5.2A5.8 5.8 0 0 0 8.1 16.2 4.3 4.3 0 0 0 9 15m3 0"/><path d="M12 15c1.2 0 2.3.4 3.1 1.2A5.8 5.8 0 0 1 19 20.1c0 2.2-1.2 4.2-3 5.2-.5.3-1.2.3-1.7 0-1.8-1-3-3-3-5.2A5.8 5.8 0 0 1 15.9 16.2 4.3 4.3 0 0 1 15 15m-3-6h6"/></svg>
+                     Créer avec l'IA
+                 </button>
+                 <button id="new-playlist-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                     Nouvelle playlist
+                 </button>
+            </div>
+        </aside>
+
+        <main id="main-content" class="overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <div class="max-w-7xl mx-auto">
+                <div class="relative mb-8 flex items-center gap-4">
+                    <button id="menu-toggle-btn" class="lg:hidden text-white bg-slate-800/50 p-2 rounded-md hover:bg-slate-700 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    </button>
+                   <div class="relative w-full">
+                        <input type="search" id="search-input" placeholder="Rechercher un titre ou un artiste..." class="w-full bg-slate-800 border border-transparent focus:border-emerald-500 rounded-full py-3 pl-12 pr-4 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all duration-300">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div>
+                   </div>
+                </div>
+                <div id="view-container">
+                    <h1 id="view-title" class="text-3xl md:text-4xl font-bold text-white mb-6"></h1>
+                    <div id="song-list" class="space-y-1"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="fixed bottom-0 left-0 right-0 h-[90px] bg-slate-800/80 backdrop-blur-md border-t border-slate-700/50 flex items-center justify-between px-4 sm:px-6">
+        <div class="w-1/3 lg:w-1/4 flex items-center gap-3 min-w-0">
+            <img id="player-art" src="https://placehold.co/64x64/1e293b/475569?text=Sear" class="w-12 h-12 md:w-16 md:h-16 rounded-md object-cover flex-shrink-0">
+            <div class="min-w-0">
+                <p id="player-title" class="font-semibold text-white truncate text-sm md:text-base">Aucune lecture</p>
+                <p id="player-artist" class="text-xs md:text-sm text-slate-400 truncate hidden sm:block">...</p>
+            </div>
+        </div>
+        <div class="w-1/3 lg:w-1/2 flex flex-col items-center gap-2">
+            <div class="flex items-center gap-3 md:gap-4">
+                <button id="loop-btn" class="loop-btn text-slate-400 hover:text-white transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                </button>
+                <button id="prev-btn" class="text-slate-400 hover:text-white disabled:text-slate-600 disabled:cursor-not-allowed transition">
+                    <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 6v12l-5-6zM8 6v12l10-6z"/></svg>
+                </button>
+                <button id="play-pause-btn" class="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-lg hover:scale-105 transition-transform duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed"></button>
+                <button id="next-btn" class="text-slate-400 hover:text-white disabled:text-slate-600 disabled:cursor-not-allowed transition">
+                    <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17 6v12l5-6zM16 6v12L6 12z"/></svg>
+                </button>
+                <button id="lyrics-btn" class="lyrics-btn text-slate-400 disabled:text-slate-600 disabled:cursor-not-allowed transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 6.1H3"/><path d="M21 12.1H3"/><path d="M15.1 18.1H3"/></svg>
+                </button>
+            </div>
+            <div class="w-full max-w-lg flex items-center gap-3 text-xs">
+                <span id="current-time" class="w-10 text-center">0:00</span>
+                <input id="progress-bar" type="range" value="0" step="1" class="w-full h-1.5 bg-slate-600 rounded-lg appearance-none cursor-pointer player-slider">
+                <span id="duration" class="w-10 text-center">0:00</span>
+            </div>
+        </div>
+        <div class="w-1/3 lg:w-1/4 flex justify-end items-center gap-1 md:gap-3">
+             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden sm:block"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+             <input id="volume-slider" type="range" min="0" max="100" step="1" value="100" class="w-12 sm:w-24 h-1.5 bg-slate-500 rounded-lg appearance-none cursor-pointer player-slider">
+        </div>
+    </footer>
+    
+    <div id="youtube-player" class="absolute -top-full left-0"></div>
+    <div id="modal-backdrop" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 hidden transition-opacity duration-300"></div>
+    
+    <div id="playlist-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 rounded-lg shadow-2xl p-6 w-[90%] max-w-sm z-50 hidden flex-col">
+        <h3 class="text-xl font-bold mb-4 text-white">Créer une nouvelle playlist</h3>
+        <input id="playlist-name-input" type="text" placeholder="Nom de la playlist" class="w-full bg-slate-700 text-white rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 outline-none">
+        <div class="mt-6 flex justify-end gap-4">
+            <button class="modal-cancel py-2 px-5 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" data-modal-id="playlist-modal">Annuler</button>
+            <button id="playlist-create" class="py-2 px-5 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-semibold">Créer</button>
+        </div>
+    </div>
+    
+    <div id="add-to-playlist-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 rounded-lg shadow-2xl p-6 w-[90%] max-w-sm z-50 hidden flex-col">
+        <h3 class="text-xl font-bold mb-4 text-white">Ajouter à...</h3>
+        <ul id="add-to-playlist-list" class="space-y-2 max-h-60 overflow-y-auto pr-2 mb-6"></ul>
+        <div class="mt-6 flex justify-end">
+            <button class="modal-cancel py-2 px-5 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" data-modal-id="add-to-playlist-modal">Annuler</button>
+        </div>
+    </div>
+    
+    <div id="ai-prompt-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 rounded-lg shadow-2xl p-6 w-[90%] max-w-lg z-50 hidden flex-col">
+        <h3 class="text-2xl font-bold mb-4 text-white">Créer une playlist avec l'IA</h3>
+        <p class="text-slate-400 mb-6">Décrivez la playlist de vos rêves (ex: "rock français des années 80", "musique pour se concentrer").</p>
+        <textarea id="ai-prompt-input" class="w-full bg-slate-700 text-white rounded-lg p-3 h-28 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Votre description..."></textarea>
+        <div class="mt-6 flex justify-end gap-4">
+            <button class="modal-cancel py-2 px-5 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" data-modal-id="ai-prompt-modal">Annuler</button>
+            <button id="ai-generate-btn" class="py-2 px-5 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors font-semibold">Générer</button>
+        </div>
+    </div>
+
+    <div id="ai-results-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 rounded-lg shadow-2xl p-6 w-[90%] max-w-2xl max-h-[90vh] z-50 hidden flex-col">
+        <h3 class="text-2xl font-bold mb-4 text-white">Suggestions de l'IA</h3>
+        <ul id="ai-results-list" class="flex-1 overflow-y-auto space-y-2 pr-2 mb-6"></ul>
+        <div class="flex justify-end gap-4 flex-wrap">
+            <button class="modal-cancel py-2 px-5 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" data-modal-id="ai-results-modal">Fermer</button>
+            <button id="ai-import-btn" class="py-2 px-5 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-semibold">Importer dans une nouvelle playlist</button>
+        </div>
+    </div>
+    
+    <div id="lyrics-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 rounded-lg shadow-2xl p-6 w-[90%] max-w-2xl max-h-[90vh] z-50 hidden flex-col">
+        <h3 id="lyrics-title" class="text-2xl font-bold mb-4 text-white">Paroles</h3>
+        <div id="lyrics-content" class="flex-1 overflow-y-auto whitespace-pre-wrap text-slate-300"></div>
+        <div class="mt-6 flex justify-end gap-4">
+            <button class="modal-cancel py-2 px-5 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" data-modal-id="lyrics-modal">Fermer</button>
+        </div>
+    </div>
+
+    <script>
+    // --- Lancement de l'API YouTube ---
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api"; // Correction du lien de l'API
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    
+    // --- Cette fonction est appelée par l'API YouTube quand elle est prête ---
+    function onYouTubeIframeAPIReady() {
+        const app = new SearApp();
+        window.onPlayerReady = app.onPlayerReady.bind(app);
+        window.onPlayerStateChange = app.onPlayerStateChange.bind(app);
+
+        app.ytPlayer = new YT.Player('youtube-player', {
+            height: '200', width: '300',
+            playerVars: { 'autoplay': 0, 'controls': 0, 'fs': 0, 'modestbranding': 1, 'showinfo': 0, 'origin': window.location.origin },
+            events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }
+        });
+    }
+
+    class SearApp {
+        constructor() {
+            this.ytPlayer = null;
+            // IMPORTANT: Remplacez les clés ci-dessous par les vôtres
+            this.YOUTUBE_API_KEY = "AIzaSyCiz8e9IOMm5HUtk5qh4ZbTrKsx3_HkuNE"; 
+            this.GEMINI_API_KEY = "AIzaSyDkaEerpi4WeWJBY0-MuZWSJpmDV7lm8r4"; 
+            this.DB_NAME = 'SearYouTubeDB';
+            this.DB_VERSION = 1;
+            this.STORE_NAME = 'searData';
+            this.db = null;
+            this.appData = { playlists: [], songs: {} };
+            this.currentView = { type: 'playlist', id: 'liked' };
+            this.currentQueue = [];
+            this.currentSongIndex = -1;
+            this.songToAdd = null;
+            this.progressInterval = null;
+            this.isLooping = false;
+            this.aiSongSuggestions = [];
+            this.searchTimeout = null;
+            this.dom = this.getDomElements();
+            this.ICONS = {
+                play: `<svg xmlns="http://www.w3.org/2000/svg" class="w-full h-full" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
+                pause: `<svg xmlns="http://www.w3.org/2000/svg" class="w-full h-full" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`
+            };
+        }
+
+        onPlayerReady(event) {
+            this.init();
+        }
+
+        onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.ENDED && this.isLooping) {
+                this.ytPlayer.seekTo(0);
+                this.ytPlayer.playVideo();
+            } else if (event.data === YT.PlayerState.ENDED) {
+                this.dom.nextBtn.click();
+            }
+            this.updateUiOnPlayerStateChange();
+        }
+        
+        getDomElements() {
+            return {
+                mainContent: document.getElementById('main-content'),
+                viewTitle: document.getElementById('view-title'),
+                songList: document.getElementById('song-list'),
+                playlistsNav: document.getElementById('playlists-nav'),
+                searchInput: document.getElementById('search-input'),
+                playerArt: document.getElementById('player-art'),
+                playerTitle: document.getElementById('player-title'),
+                playerArtist: document.getElementById('player-artist'),
+                playPauseBtn: document.getElementById('play-pause-btn'),
+                nextBtn: document.getElementById('next-btn'),
+                prevBtn: document.getElementById('prev-btn'),
+                loopBtn: document.getElementById('loop-btn'),
+                lyricsBtn: document.getElementById('lyrics-btn'),
+                progressBar: document.getElementById('progress-bar'),
+                currentTime: document.getElementById('current-time'),
+                duration: document.getElementById('duration'),
+                volumeSlider: document.getElementById('volume-slider'),
+                modalBackdrop: document.getElementById('modal-backdrop'),
+                newPlaylistBtn: document.getElementById('new-playlist-btn'),
+                playlistModal: document.getElementById('playlist-modal'),
+                playlistNameInput: document.getElementById('playlist-name-input'),
+                playlistCreateBtn: document.getElementById('playlist-create'),
+                aiPlaylistBtn: document.getElementById('ai-playlist-btn'),
+                aiPromptModal: document.getElementById('ai-prompt-modal'),
+                aiPromptInput: document.getElementById('ai-prompt-input'),
+                aiGenerateBtn: document.getElementById('ai-generate-btn'),
+                aiResultsModal: document.getElementById('ai-results-modal'),
+                aiResultsList: document.getElementById('ai-results-list'),
+                aiImportBtn: document.getElementById('ai-import-btn'),
+                lyricsModal: document.getElementById('lyrics-modal'),
+                lyricsTitle: document.getElementById('lyrics-title'),
+                lyricsContent: document.getElementById( 'lyrics-content'),
+                addToPlaylistModal: document.getElementById('add-to-playlist-modal'),
+                addToPlaylistList: document.getElementById('add-to-playlist-list'),
+                sidebar: document.getElementById('sidebar'),
+                sidebarBackdrop: document.getElementById('sidebar-backdrop'),
+                menuToggleBtn: document.getElementById('menu-toggle-btn'),
+            };
+        }
+    
+        initDB() { return new Promise((resolve) => { const request = indexedDB.open(this.DB_NAME, this.DB_VERSION); request.onupgradeneeded = e => { e.target.result.createObjectStore(this.STORE_NAME); }; request.onsuccess = e => { this.db = e.target.result; resolve(this.db); }; request.onerror = e => console.error("DB Error:", e); }); }
+        saveData() { return new Promise((resolve) => { if(!this.db) return; const transaction = this.db.transaction(this.STORE_NAME, 'readwrite'); const store = transaction.objectStore(this.STORE_NAME); store.put(this.appData, 'appData'); transaction.oncomplete = () => resolve(); }); }
+        loadData() { return new Promise((resolve) => { if(!this.db) return; const transaction = this.db.transaction(this.STORE_NAME, 'readonly'); const store = transaction.objectStore(this.STORE_NAME); const request = store.get('appData'); request.onsuccess = e => { if (e.target.result) this.appData = e.target.result; resolve(); }; }); }
+    
+        // =================================================================
+        // == MODIFICATION PRINCIPALE : LA CRÉATION DE PLAYLIST FONCTIONNE ==
+        // =================================================================
+        createPlaylist(name) {
+            if (!name.trim()) return;
+            const newPlaylist = { id: crypto.randomUUID(), name: name.trim(), songs: [] };
+            this.appData.playlists.push(newPlaylist);
+            this.saveData();
+            this.renderPlaylistsNav();
+            this.closeModal(this.dom.playlistModal);
+            
+            // L'AJOUT QUI CHANGE TOUT :
+            // Affiche directement la nouvelle playlist pour confirmer sa création.
+            this.renderSongListView(newPlaylist.id); 
+        }
+
+        addSongToPlaylist(song, playlistId) {
+            if (!this.appData.songs[song.id]) { this.appData.songs[song.id] = song; }
+            const playlist = this.appData.playlists.find(p => p.id === playlistId);
+            if (playlist && !playlist.songs.includes(song.id)) {
+                playlist.songs.unshift(song.id);
+                this.saveData();
+                if (this.currentView.type === 'playlist' && this.currentView.id === playlistId) {
+                    this.renderSongListView(playlistId);
+                }
+            }
+        }
+    
+        playSong(songId, queue, index) {
+            this.currentQueue = queue;
+            this.currentSongIndex = index;
+            const song = this.appData.songs[songId];
+            if (!song) return;
+            this.ytPlayer.loadVideoById(song.id);
+            this.updatePlayerUI(song);
+            this.updateControlStates();
+        }
+    
+        renderPlaylistsNav() {
+            this.dom.playlistsNav.innerHTML = '';
+            this.appData.playlists.forEach(p => {
+                const li = document.createElement('li');
+                // AMÉLIORATION DESIGN : Style plus marqué pour la playlist active
+                const isActive = this.currentView.type === 'playlist' && this.currentView.id === p.id;
+                li.innerHTML = `
+                    <a href="#" data-playlist-id="${p.id}" class="flex items-center gap-3 px-2 py-2 rounded-md transition-colors duration-200 ${isActive ? 'bg-emerald-600/20 text-emerald-300 font-semibold' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 flex-shrink-0"><path d="M9 18V5l12-2v13"/><path d="M12 15v5"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                        <span class="truncate">${p.name}</span>
+                    </a>
+                `;
+                this.dom.playlistsNav.appendChild(li);
+            });
+        }
+
+        renderSongListView(playlistId) {
+            this.currentView = { type: 'playlist', id: playlistId };
+            const playlist = this.appData.playlists.find(p => p.id === playlistId);
+            if (!playlist) return;
+            this.dom.viewTitle.textContent = playlist.name;
+            const songIds = playlist.songs;
+            const songs = songIds.map(id => this.appData.songs[id]).filter(Boolean);
+            this.renderSongList(songs, songIds, { showAddButton: false });
+            this.renderPlaylistsNav();
+            this.dom.mainContent.scrollTop = 0;
+        }
+    
+        async searchYouTube(query) {
+            this.currentView = { type: 'search', query: query };
+            this.dom.viewTitle.textContent = `Résultats pour "${query}"`;
+            this.dom.songList.innerHTML = `<div class="flex justify-center p-10"><div class="loading-spinner"></div></div>`;
+            const maxResults = 25;
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${maxResults}&key=${this.YOUTUBE_API_KEY}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) { const errorData = await response.json(); const reason = errorData.error.errors[0].reason; throw new Error(`Erreur ${response.status}: ${reason}`); }
+                const data = await response.json();
+                const results = data.items.map(item => ({
+                    id: item.id.videoId,
+                    title: item.snippet.title,
+                    artist: item.snippet.channelTitle,
+                    thumbnail: item.snippet.thumbnails.high.url,
+                }));
+                this.renderSongList(results, [], { showAddButton: true });
+            } catch (error) {
+                console.error("Erreur lors de la recherche sur YouTube:", error);
+                this.dom.songList.innerHTML = `<p class="text-slate-400 p-4 text-center bg-red-900/50 rounded-lg">Erreur lors de la recherche : ${error.message}.<br>Vérifiez que votre clé d'API YouTube est valide.</p>`;
+            }
+        }
+    
+        renderSongList(songs, queue, options = { showAddButton: false }) {
+            this.dom.songList.innerHTML = '';
+            if (songs.length === 0) { this.dom.songList.innerHTML = `<p class="text-slate-400 p-4 text-center">Cette playlist est vide. Ajoutez des titres depuis la recherche !</p>`; return; }
+            const songQueueIds = songs.map(s => s.id);
+            songs.forEach((song, index) => {
+                if (!song) return;
+                const row = document.createElement('div');
+                const isPlaying = this.ytPlayer && this.ytPlayer.getVideoData && this.ytPlayer.getPlayerState && this.ytPlayer.getVideoData().video_id === song.id;
+                // AMÉLIORATION DESIGN : Plus d'espace et transition douce
+                row.className = `song-row group grid grid-cols-[40px_1fr_40px] md:grid-cols-[40px_minmax(0,4fr)_minmax(0,3fr)_40px] items-center gap-4 p-3 rounded-lg hover:bg-slate-800/60 transition-colors duration-200 ${isPlaying ? 'is-playing bg-slate-800' : ''}`;
+                row.dataset.songId = song.id;
+                row.innerHTML = `
+                    <div class="relative text-center text-slate-400">
+                        <span class="group-hover:hidden ${isPlaying ? 'text-emerald-400' : ''}">${index + 1}</span>
+                        <button class="play-icon absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white w-6 h-6" data-action="play">
+                            ${isPlaying && this.ytPlayer.getPlayerState() === YT.PlayerState.PLAYING ? this.ICONS.pause : this.ICONS.play}
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-4 min-w-0">
+                        <img src="${song.thumbnail}" class="w-12 h-12 rounded object-cover flex-shrink-0">
+                        <div class="min-w-0">
+                            <p class="font-semibold truncate ${isPlaying ? 'text-emerald-400' : 'text-white'}">${song.title}</p>
+                            <p class="text-sm truncate text-slate-400 hidden md:block">${song.artist}</p>
+                        </div>
+                    </div>
+                    <p class="hidden md:block truncate text-slate-400">${song.artist}</p>
+                    <div class="flex-shrink-0">
+                        ${options.showAddButton ? `<button data-action="add" title="Ajouter à une playlist" class="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>` : ''}
+                    </div>`;
+                row.addEventListener('click', (e) => {
+                    const action = e.target.closest('[data-action]')?.dataset.action;
+                    if (action === 'play') {
+                        if (isPlaying && this.ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) this.ytPlayer.pauseVideo();
+                        else if (isPlaying) this.ytPlayer.playVideo();
+                        else {
+                            if (options.showAddButton && !this.appData.songs[song.id]) { this.appData.songs[song.id] = song; this.saveData(); }
+                            this.playSong(song.id, songQueueIds, index);
+                        }
+                    } else if (action === 'add') {
+                        this.songToAdd = song;
+                        this.openAddToPlaylistModal();
+                    }
+                });
+                this.dom.songList.appendChild(row);
+            });
+            this.currentQueue = songQueueIds;
+        }
+    
+        openAddToPlaylistModal() {
+            if (!this.songToAdd) return;
+            const modal = this.dom.addToPlaylistModal;
+            const list = this.dom.addToPlaylistList;
+            list.innerHTML = '';
+            this.appData.playlists.forEach(p => {
+                const li = document.createElement('li');
+                li.className = 'p-3 rounded-md hover:bg-slate-700 cursor-pointer transition-colors';
+                li.textContent = p.name;
+                li.addEventListener('click', () => {
+                    if (this.songToAdd) {
+                        this.addSongToPlaylist(this.songToAdd, p.id);
+                        this.songToAdd = null;
+                        this.closeModal(modal);
+                    }
+                });
+                list.appendChild(li);
+            });
+            this.openModal(modal);
+        }
+    
+        async callGeminiAPI(prompt, isJson = false) {
+            if (!this.GEMINI_API_KEY || this.GEMINI_API_KEY.includes("YOUR")) { alert("Veuillez configurer votre clé d'API Gemini dans le code JS."); return null; }
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.GEMINI_API_KEY}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+            if (isJson) { payload.generationConfig = { responseMimeType: "application/json", responseSchema: { type: "OBJECT", properties: { songs: { type: "ARRAY", items: { type: "OBJECT", properties: { title: { type: "STRING" }, artist: { type: "STRING" } }, required: ["title", "artist"] } } } } }; }
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`Erreur API Gemini: ${response.status}`);
+                const result = await response.json();
+                const text = result.candidates[0].content.parts[0].text;
+                return isJson ? JSON.parse(text) : text;
+            } catch (error) { console.error("Erreur Gemini API:", error); alert("Une erreur est survenue avec l'IA Gemini. Vérifiez votre clé d'API."); return null; }
+        }
+
+        async handleAIGeneration() {
+            const prompt = this.dom.aiPromptInput.value;
+            if (!prompt.trim()) return;
+            this.closeModal(this.dom.aiPromptModal);
+            this.showLoading("L'IA génère votre playlist...");
+            const aiPrompt = `Génère une liste de 10 chansons basée sur cette description : "${prompt}". Ne réponds rien d'autre que le JSON.`;
+            const result = await this.callGeminiAPI(aiPrompt, true);
+            this.hideLoading();
+            if (result && result.songs) {
+                this.aiSongSuggestions = result.songs;
+                this.dom.aiResultsList.innerHTML = this.aiSongSuggestions.map(song => `<li class="p-2 bg-slate-700/50 rounded">${song.title} - ${song.artist}</li>`).join('');
+                this.openModal(this.dom.aiResultsModal);
+            }
+        }
+
+        async handleAIImport() {
+            if (this.aiSongSuggestions.length === 0) return;
+            this.closeModal(this.dom.aiResultsModal);
+            this.showLoading(`Importation de ${this.aiSongSuggestions.length} titres...`);
+            const newPlaylistName = this.dom.aiPromptInput.value.trim().substring(0, 30) || "Playlist IA";
+            const newPlaylist = { id: crypto.randomUUID(), name: newPlaylistName, songs: [] };
+            for (const [index, song] of this.aiSongSuggestions.entries()) {
+                this.showLoading(`Recherche de "${song.title}" (${index + 1}/${this.aiSongSuggestions.length})`);
+                const query = `${song.title} ${song.artist}`;
+                const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=1&key=${this.YOUTUBE_API_KEY}`;
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    if (data.items && data.items.length > 0) {
+                        const item = data.items[0];
+                        const newSong = { id: item.id.videoId, title: item.snippet.title, artist: item.snippet.channelTitle, thumbnail: item.snippet.thumbnails.high.url };
+                        if (!this.appData.songs[newSong.id]) this.appData.songs[newSong.id] = newSong;
+                        newPlaylist.songs.push(newSong.id);
+                    }
+                } catch (error) { console.error(`Erreur recherche pour "${song.title}":`, error); }
+            }
+            this.appData.playlists.push(newPlaylist);
+            await this.saveData();
+            this.renderPlaylistsNav();
+            this.renderSongListView(newPlaylist.id);
+            this.hideLoading();
+        }
+
+        async handleLyricsFetch() {
+            if (this.currentSongIndex < 0 || !this.currentQueue[this.currentSongIndex]) return;
+            const song = this.appData.songs[this.currentQueue[this.currentSongIndex]];
+            if (!song) return;
+            this.openModal(this.dom.lyricsModal);
+            this.dom.lyricsTitle.textContent = `Paroles de ${song.title}`;
+            this.dom.lyricsContent.innerHTML = `<div class="flex justify-center p-10"><div class="loading-spinner"></div></div>`;
+            const prompt = `Trouve les paroles complètes de la chanson "${song.title}" par "${song.artist}". Si tu ne les trouves pas, réponds simplement "Paroles non trouvées.".`;
+            const lyrics = await this.callGeminiAPI(prompt);
+            this.dom.lyricsContent.textContent = lyrics || "Impossible de récupérer les paroles.";
+        }
+    
+        updateUiOnPlayerStateChange() {
+            const isPlaying = this.ytPlayer.getPlayerState() === YT.PlayerState.PLAYING;
+            if (isPlaying) {
+                this.dom.playPauseBtn.innerHTML = this.ICONS.pause;
+                const duration = this.ytPlayer.getDuration();
+                this.dom.duration.textContent = this.formatTime(duration);
+                this.dom.progressBar.max = duration; // Use duration for max
+                clearInterval(this.progressInterval);
+                this.progressInterval = setInterval(() => {
+                    const currentTime = this.ytPlayer.getCurrentTime();
+                    this.dom.currentTime.textContent = this.formatTime(currentTime);
+                    this.dom.progressBar.value = currentTime;
+                }, 500);
+            } else {
+                this.dom.playPauseBtn.innerHTML = this.ICONS.play;
+                clearInterval(this.progressInterval);
+            }
+            // Rafraîchit la vue actuelle pour mettre à jour l'icône play/pause sur la ligne
+            if (this.currentView.type === 'playlist') {
+                const playlist = this.appData.playlists.find(p => p.id === this.currentView.id);
+                if(playlist) {
+                    const songs = playlist.songs.map(id => this.appData.songs[id]).filter(Boolean);
+                    this.renderSongList(songs, playlist.songs, { showAddButton: false });
+                }
+            }
+        }
+    
+        updatePlayerUI(song) { if(!song) return; this.dom.playerArt.src = song.thumbnail; this.dom.playerTitle.textContent = song.title; this.dom.playerArtist.textContent = song.artist; this.dom.playPauseBtn.disabled = false; this.dom.lyricsBtn.disabled = false; }
+        updateControlStates() { this.dom.nextBtn.disabled = this.currentSongIndex >= this.currentQueue.length - 1; this.dom.prevBtn.disabled = this.currentSongIndex <= 0; }
+        formatTime(totalSeconds) { if(isNaN(totalSeconds)) return "0:00"; const seconds = Math.floor(totalSeconds % 60); const minutes = Math.floor(totalSeconds / 60); return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`; }
+    
+        openModal(modal) { this.dom.modalBackdrop.classList.remove('hidden'); modal.classList.remove('hidden'); modal.classList.add('flex'); }
+        closeModal(modal) { if (!modal) return; this.dom.modalBackdrop.classList.add('hidden'); modal.classList.remove('flex'); modal.classList.add('hidden'); }
+
+        showLoading(text) {
+            let modal = document.getElementById('loading-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'loading-modal';
+                modal.className = "fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center";
+                document.body.appendChild(modal);
+            }
+            modal.innerHTML = `<div class="loading-spinner"></div><p class="mt-4 text-white text-lg">${text}</p>`;
+        }
+        hideLoading() {
+            const modal = document.getElementById('loading-modal');
+            if (modal) modal.remove();
+        }
+    
+        setupEventListeners() {
+            this.dom.menuToggleBtn.addEventListener('click', () => {
+                this.dom.sidebar.classList.add('sidebar-open');
+                this.dom.sidebarBackdrop.classList.remove('hidden');
+            });
+            const closeSidebar = () => {
+                this.dom.sidebar.classList.remove('sidebar-open');
+                this.dom.sidebarBackdrop.classList.add('hidden');
+            };
+            this.dom.sidebarBackdrop.addEventListener('click', closeSidebar);
+
+            this.dom.newPlaylistBtn.addEventListener('click', () => { this.dom.playlistNameInput.value = ''; this.openModal(this.dom.playlistModal); });
+            this.dom.playlistCreateBtn.addEventListener('click', () => this.createPlaylist(this.dom.playlistNameInput.value));
+            
+            document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', (e) => {
+                const modalId = e.target.closest('[data-modal-id]').dataset.modalId;
+                if(modalId) this.closeModal(document.getElementById(modalId));
+            }));
+
+            this.dom.aiPlaylistBtn.addEventListener('click', () => this.openModal(this.dom.aiPromptModal));
+            this.dom.aiGenerateBtn.addEventListener('click', () => this.handleAIGeneration());
+            this.dom.aiImportBtn.addEventListener('click', () => this.handleAIImport());
+            this.dom.loopBtn.addEventListener('click', () => { this.isLooping = !this.isLooping; this.dom.loopBtn.classList.toggle('active', this.isLooping); });
+            this.dom.lyricsBtn.addEventListener('click', () => this.handleLyricsFetch());
+            
+            this.dom.playlistsNav.addEventListener('click', (e) => { 
+                const link = e.target.closest('a[data-playlist-id]'); 
+                if (link) { 
+                    e.preventDefault(); 
+                    this.renderSongListView(link.dataset.playlistId); 
+                    if (window.innerWidth < 1024) { closeSidebar(); }
+                } 
+            });
+            
+            this.dom.searchInput.addEventListener('input', () => {
+                clearTimeout(this.searchTimeout);
+                this.searchTimeout = setTimeout(() => {
+                    const query = this.dom.searchInput.value.trim();
+                    if (query) { this.searchYouTube(query); } 
+                    else { this.renderSongListView('liked'); }
+                }, 500); // Délai réduit à 500ms
+            });
+
+            this.dom.playPauseBtn.addEventListener('click', () => { if (!this.ytPlayer || typeof this.ytPlayer.getPlayerState !== 'function') return; const state = this.ytPlayer.getPlayerState(); if (state === YT.PlayerState.PLAYING) this.ytPlayer.pauseVideo(); else if (this.currentSongIndex !== -1) this.ytPlayer.playVideo(); });
+            this.dom.nextBtn.addEventListener('click', () => { if (this.currentSongIndex < this.currentQueue.length - 1) { this.playSong(this.currentQueue[this.currentSongIndex + 1], this.currentQueue, this.currentSongIndex + 1); } });
+            this.dom.prevBtn.addEventListener('click', () => { if (this.ytPlayer.getCurrentTime() > 3 || this.currentSongIndex === 0) this.ytPlayer.seekTo(0); else if (this.currentSongIndex > 0) this.playSong(this.currentQueue[this.currentSongIndex - 1], this.currentQueue, this.currentSongIndex - 1); });
+            this.dom.volumeSlider.addEventListener('input', (e) => { if (this.ytPlayer && typeof this.ytPlayer.setVolume === 'function') this.ytPlayer.setVolume(e.target.value) });
+            this.dom.progressBar.addEventListener('input', (e) => { const duration = this.ytPlayer.getDuration(); if (duration) this.ytPlayer.seekTo(e.target.value); });
+        }
+    
+        async init(){
+            this.dom.playPauseBtn.innerHTML = this.ICONS.play;
+            this.dom.playPauseBtn.disabled = true;
+            this.dom.lyricsBtn.disabled = true;
+            await this.initDB();
+            await this.loadData();
+            if (!this.appData.playlists.find(p => p.id === 'liked')) {
+                 this.appData.playlists.unshift({ id: 'liked', name: 'Titres likés', songs: [] });
+                 this.saveData();
+            }
+            this.renderPlaylistsNav();
+            this.renderSongListView('liked');
+            this.setupEventListeners();
+        }
+    }
+    </script>
+</body>
+</html>
